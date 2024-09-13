@@ -1,3 +1,11 @@
+import os
+import sys
+
+import copy
+import argparse
+import logging
+from tqdm import tqdm
+from PIL import ImageFile
 
 import numpy as np
 import torch
@@ -7,27 +15,20 @@ import torchvision
 import torchvision.models as models
 import torchvision.transforms as transforms
 
-import copy
-import argparse
-import os
-import logging
-import sys
-from tqdm import tqdm
-from PIL import ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
-logger=logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 logger.addHandler(logging.StreamHandler(sys.stdout))
 
 def test(model, test_loader, criterion):
     model.eval()
-    running_loss=0
+    running_loss = 0
     running_corrects=0
     
     for inputs, labels in test_loader:
-        outputs=model(inputs)
-        loss=criterion(outputs, labels)
+        outputs = model(inputs)
+        loss = criterion(outputs, labels)
         _, preds = torch.max(outputs, 1)
         running_loss += loss.item() * inputs.size(0)
         running_corrects += torch.sum(preds == labels.data)
@@ -39,15 +40,15 @@ def test(model, test_loader, criterion):
     logger.info(f"Testing Accuracy: {total_acc}")
 
 def train(model, train_loader, validation_loader, criterion, optimizer):
-    epochs=50
-    best_loss=1e6
-    image_dataset={'train':train_loader, 'valid':validation_loader}
+    epochs = 50
+    best_loss = 1e6
+    image_dataset = {'train':train_loader, 'valid':validation_loader}
     loss_counter=0
     
     for epoch in range(epochs):
         logger.info(f"Epoch: {epoch}")
         for phase in ['train', 'valid']:
-            if phase=='train':
+            if phase == 'train':
                 model.train()
             else:
                 model.eval()
@@ -58,7 +59,7 @@ def train(model, train_loader, validation_loader, criterion, optimizer):
                 outputs = model(inputs)
                 loss = criterion(outputs, labels)
 
-                if phase=='train':
+                if phase == 'train':
                     optimizer.zero_grad()
                     loss.backward()
                     optimizer.step()
@@ -70,7 +71,7 @@ def train(model, train_loader, validation_loader, criterion, optimizer):
             epoch_loss = running_loss // len(image_dataset[phase])
             epoch_acc = running_corrects // len(image_dataset[phase])
             
-            if phase=='valid':
+            if phase == 'valid':
                 if epoch_loss<best_loss:
                     best_loss=epoch_loss
                 else:
@@ -81,13 +82,14 @@ def train(model, train_loader, validation_loader, criterion, optimizer):
                                                                                  epoch_loss,
                                                                                  epoch_acc,
                                                                                  best_loss))
-        if loss_counter==1:
+        if loss_counter == 1:
             break
-        if epoch==0:
+        if epoch == 0:
             break
     return model
     
 def net():
+
     model = models.resnet50(pretrained=True)
 
     for param in model.parameters():
@@ -97,6 +99,7 @@ def net():
                    nn.Linear(2048, 128),
                    nn.ReLU(inplace=True),
                    nn.Linear(128, 133))
+    
     return model
 
 def create_data_loaders(data, batch_size):
@@ -130,18 +133,24 @@ def main(args):
     logger.info(f'Hyperparameters are LR: {args.learning_rate}, Batch Size: {args.batch_size}')
     logger.info(f'Data Paths: {args.data}')
     
+    # Instance data loaders
     train_loader, test_loader, validation_loader=create_data_loaders(args.data, args.batch_size)
-    model=net()
+    # Instance model
+    model = net()
     
+    # Set model configurations
     criterion = nn.CrossEntropyLoss(ignore_index=133)
     optimizer = optim.Adam(model.fc.parameters(), lr=args.learning_rate)
     
     logger.info("Starting Model Training")
-    model=train(model, train_loader, validation_loader, criterion, optimizer)
+    # Train the model
+    model = train(model, train_loader, validation_loader, criterion, optimizer)
     
+    # Perform testing
     logger.info("Testing Model")
     test(model, test_loader, criterion)
     
+    # Save the model locally
     logger.info("Saving Model")
     torch.save(model.cpu().state_dict(), os.path.join(args.model_dir, "model.pth"))
 
@@ -153,7 +162,7 @@ if __name__=='__main__':
     parser.add_argument('--model_dir', type=str, default=os.environ['SM_MODEL_DIR'])
     parser.add_argument('--output_dir', type=str, default=os.environ['SM_OUTPUT_DATA_DIR'])
     
-    args=parser.parse_args()
+    args = parser.parse_args()
     print(args)
     
     main(args)
