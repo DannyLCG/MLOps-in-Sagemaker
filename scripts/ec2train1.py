@@ -13,6 +13,7 @@ import logging
 import sys
 from tqdm import tqdm
 from PIL import ImageFile
+
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 #rom torch_snippets import Report
@@ -131,10 +132,10 @@ def create_data_loaders(data, batch_size):
     
     return train_data_loader, test_data_loader, validation_data_loader
 
-batch_size=2
-learning_rate=1e-4
-train_loader, test_loader, validation_loader=create_data_loaders('dogImages',batch_size)
-model=net()
+batch_size = 32
+learning_rate = 0.0061
+train_loader, test_loader, validation_loader = create_data_loaders('dogImages', batch_size)
+model = net()
 
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.fc.parameters(), lr=learning_rate)
